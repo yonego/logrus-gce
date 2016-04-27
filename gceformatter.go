@@ -12,7 +12,7 @@ import (
 type severity string
 
 const (
-	logrusToCallerSkip = 4
+	logrusToCallerSkip = 5
 )
 
 const (
