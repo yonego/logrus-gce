@@ -2,8 +2,11 @@ package logrusgce
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -37,10 +40,49 @@ var (
 	}
 )
 
+var (
+	stackSkipsCallers = make([]uintptr, 0, 20)
+	stackSkips        = map[logrus.Level]int{}
+	stackSkipsMu      = sync.RWMutex{}
+)
+
+var (
+	ErrSkipNotFound = errors.New("could not find skips for log level")
+)
+
 type sourceLocation struct {
 	File         string `json:"file"`
 	Line         int    `json:"line"`
 	FunctionName string `json:"functionName"`
+}
+
+func getSkipLevel(level logrus.Level) (int, error) {
+	stackSkipsMu.RLock()
+	if skip, ok := stackSkips[level]; ok {
+		defer stackSkipsMu.RUnlock()
+		return skip, nil
+	}
+	stackSkipsMu.RUnlock()
+
+	stackSkipsMu.Lock()
+	defer stackSkipsMu.Unlock()
+	if skip, ok := stackSkips[level]; ok {
+		return skip, nil
+	}
+
+	// detect until we escape logrus back to the client package
+	// skip out of runtime and logrusgce package, hence 3
+	stackSkipsCallers := make([]uintptr, 20)
+	runtime.Callers(3, stackSkipsCallers)
+	for i, pc := range stackSkipsCallers {
+		f := runtime.FuncForPC(pc)
+		if strings.HasPrefix(f.Name(), "github.com/Sirupsen/logrus") == true {
+			continue
+		}
+		stackSkips[level] = i + 1
+		return i + 1, nil
+	}
+	return 0, ErrSkipNotFound
 }
 
 type GCEFormatter struct {
@@ -65,17 +107,20 @@ func (f *GCEFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 
 	data["time"] = entry.Time.Format(time.RFC3339Nano)
-	data["severity"] = string(levelsLogrusToGCE[entry.Level])
+	data["severity"] = levelsLogrusToGCE[entry.Level]
 	data["logMessage"] = entry.Message
 
 	if f.withSourceInfo == true {
-		pc, file, line, ok := runtime.Caller(logrusToCallerSkip)
-		if ok {
+		skip, err := getSkipLevel(entry.Level)
+		if err != nil {
+			return nil, err
+		}
+		if pc, file, line, ok := runtime.Caller(skip); ok {
 			f := runtime.FuncForPC(pc)
-			data["sourceLocation"] = sourceLocation{
-				File:         file,
-				Line:         line,
-				FunctionName: f.Name(),
+			data["sourceLocation"] = map[string]interface{}{
+				"file":         file,
+				"line":         line,
+				"functionName": f.Name(),
 			}
 		}
 	}
