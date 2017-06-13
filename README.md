@@ -1,17 +1,4 @@
-# logrus-gce
-Google Cloud Engine Logging Formatter for Logrus
+# Forked logrus-gce
+We've forked the original repository because it breaks on the package change from `github.com/Sirupsen/logrus` to `github.com/sirupsen/logrus`.
 
-## How to use
-```golang
-package main
-
-import (
-	log "github.com/Sirupsen/logrus"
-    logrusgce "github.com/znly/logrus-gce"
-)
-
-func main() {
-    log.SetFormatter(logrusgce.NewGCEFormatter(true))
-    log.WithField("myfield", "myvalue").Info("hey")
-}
-```
+See the original repository for more information.
