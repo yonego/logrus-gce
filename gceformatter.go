@@ -87,9 +87,14 @@ func getSkipLevel(level logrus.Level) (int, error) {
 
 type GCEFormatter struct {
 	withSourceInfo bool
+    logData		   map[string]interface{}
 }
 
 func NewGCEFormatter(withSourceInfo bool) *GCEFormatter {
+	return &GCEFormatter{withSourceInfo: withSourceInfo}
+}
+
+func NewGCEFormatterWithData(logData map[string]interface{}, withSourceInfo bool) *GCEFormatter {
 	return &GCEFormatter{withSourceInfo: withSourceInfo}
 }
 
@@ -109,6 +114,10 @@ func (f *GCEFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	data["time"] = entry.Time.Format(time.RFC3339Nano)
 	data["severity"] = levelsLogrusToGCE[entry.Level]
 	data["logMessage"] = entry.Message
+
+	for key, value := range f.logData {
+        data[key] = value
+    }
 
 	if f.withSourceInfo == true {
 		skip, err := getSkipLevel(entry.Level)
