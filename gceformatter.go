@@ -95,7 +95,7 @@ func NewGCEFormatter(withSourceInfo bool) *GCEFormatter {
 }
 
 func NewGCEFormatterWithData(logData map[string]interface{}, withSourceInfo bool) *GCEFormatter {
-	return &GCEFormatter{withSourceInfo: withSourceInfo}
+	return &GCEFormatter{withSourceInfo: withSourceInfo, logData: logData}
 }
 
 func (f *GCEFormatter) Format(entry *logrus.Entry) ([]byte, error) {
